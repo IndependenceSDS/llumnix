@@ -276,6 +276,7 @@ class Manager:
             loop.create_task(migrate_done_callback(ret, migrate_instance_pair))
 
         try:
+            # 由调度器决定迁移的实例对
             migrate_instance_pairs = self.global_scheduler.pair_migration(pair_migration_type)
             migration_tasks = []
             for _, migrate_instance_pair in enumerate(migrate_instance_pairs):
