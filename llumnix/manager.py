@@ -518,7 +518,7 @@ class Manager:
             launch_args,
             os.getcwd())
         return manager
-    # 初始化instance
+    # 初始化instance 
     def init_instances(self,
                        request_output_queue_type: QueueType,
                        backend_type: BackendType,
