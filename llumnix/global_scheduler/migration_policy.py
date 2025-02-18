@@ -84,11 +84,12 @@ class DefragConstrained(PairMigrationPolicy):
         return migrate_instance_pairs
 
 class PairMigrationPolicyFactory:
+    # 两种迁移策略
     _POLICY_REGISTRY = {
         'balanced': Balanced,
         'defrag_constrained': DefragConstrained,
     }
-
+    
     @classmethod
     def get_policy(cls, policy_name: str, **kwargs) -> PairMigrationPolicy:
         return cls._POLICY_REGISTRY[policy_name](**kwargs)

@@ -63,8 +63,10 @@ class GlobalScheduler:
         request_expected_steps = 1 if self.global_scheduler_config.enable_pd_disagg else math.inf
         return instance_id, request_expected_steps
 
+    # scheculer的迁移入口
     def pair_migration(self, pair_migration_type: PairMigrationConstraints) -> List[Tuple[str, str]]:
         self.migration_scheduler.update_instance_infos(self.instance_info)
+        # 调用迁移调度器的迁移函数
         migrate_instance_pairs = self.migration_scheduler.pair_migration(pair_migration_type)
         return migrate_instance_pairs
 
@@ -83,6 +85,7 @@ class GlobalScheduler:
                 new_intance_info = self._get_empty_instance_info()
                 new_intance_info.instance_id = ins_id
                 self.instance_info[ins_id] = new_intance_info
+                # 调用_add_instance
                 self._add_instance(ins_id, ins_args)
         logger.info("num_instances: {}, instances: {}".format(self.num_instances, self.instance_id_set))
         return self.num_instances
@@ -102,9 +105,11 @@ class GlobalScheduler:
         logger.info("num_instances: {}, instances: {}".format(self.num_instances, self.instance_id_set))
         return self.num_instances
 
+    # 增加实例时更新信息
     def _add_instance(self, instance_id: str, instance_args: InstanceArgs) -> None:
         self.instance_id_set.add(instance_id)
         self.num_instances = len(self.instance_id_set)
+        # 更新三个调度器
         for scheduler in (self.dispatch_scheduler, self.migration_scheduler, self.scaling_scheduler):
             scheduler.update_instance_infos(self.instance_info)
             scheduler.add_instance(instance_id, instance_args)

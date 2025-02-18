@@ -134,6 +134,7 @@ class Manager:
         # tasks
         # When manager starts, it automatically connects to all existing instances.
         run_async_func_sync(self._connect_to_instances())
+        # 实例信息更新的循环入口
         asyncio.create_task(self._update_instance_info_loop(self.polling_interval))
         asyncio.create_task(self._clear_request_instance_loop(CLEAR_REQUEST_INSTANCE_INTERVAL))
 
@@ -220,6 +221,7 @@ class Manager:
                     tasks.append(task)
                 await asyncio.gather(*tasks, return_exceptions=True)
                 self.num_instance_info_updates += 1
+                # 迁移启动起点
                 # Push migrate when the instance_info have updated a certain number of times.
                 if self.enable_migration and self.num_instance_info_updates != 0 \
                     and self.num_instance_info_updates % self.pair_migration_frequency == 0:
@@ -230,7 +232,7 @@ class Manager:
             except Exception as e:
                 logger.error("Unexpected exception: {}".format(e))
                 logger.error("Exception traceback: {}".format(traceback.format_exc()))
-
+    # manager的迁移入口
     async def _push_migrations(self) -> None:
         if self.enable_pd_disagg:
             asyncio.create_task(self._migrate(PairMigrationConstraints.PREFILL_2_DECODING))
@@ -394,6 +396,7 @@ class Manager:
         # Restore migrate config
         self.enable_migration = origin_config
 
+    # 该函数本身并不用于创建instance，而是在创建instance之后调用来更新所有的全局信息。
     def scale_up(self, instance_id: Union[str, Iterable[str]],
                  instance_actor_handle: Union[ray.actor.ActorHandle, List[ray.actor.ActorHandle]],
                  instance_arg: Union[InstanceArgs, Iterable[InstanceArgs]]) -> None:
@@ -416,6 +419,7 @@ class Manager:
                 if self.log_instance_info:
                     self.instance_last_logged_empty[ins_id] = False
                 self.pending_rebuild_migration_instances += 1
+        # 更新global scheduler
         self.global_scheduler.scale_up(instance_ids, instance_args)
         self.num_instances = len(self.instances)
 

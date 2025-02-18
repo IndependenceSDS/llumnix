@@ -249,6 +249,7 @@ class LLMEngineLlumnix(_AsyncLLMEngine):
             instance_info.num_blocks_last_running_request = self.instance_info.num_blocks_last_running_request
         self.instance_info = instance_info
 
+    # 添加请求
     def add_request(self, request_id: str, server_info: ServerInfo, expected_steps: int, *args, **kwargs):
         super().add_request(request_id, *args, **kwargs)
         seq_group = self.scheduler[0].waiting[-1]
@@ -280,6 +281,7 @@ class LLMEngineLlumnix(_AsyncLLMEngine):
         # TODO(s5u13b): Reduce the across-actor overhead.
         self.async_put_queue_actor.put_nowait_to_servers.remote(server_request_outputs, server_info_dict)
 
+# vllm后端
 class BackendVLLM(BackendInterface):
     def __init__(
         self,
@@ -344,6 +346,7 @@ class BackendVLLM(BackendInterface):
     def execute_worker_method(self, method, *args, **kwargs):
         return self.engine.model_executor.driver_worker.execute_method(method, *args, **kwargs)
 
+    # 添加请求
     def add_request(self,
                     request_id: str,
                     server_info: ServerInfo,

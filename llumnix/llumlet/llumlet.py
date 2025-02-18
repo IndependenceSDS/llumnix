@@ -36,7 +36,7 @@ from llumnix.constants import CHECK_ENGINE_STATE_INTERVAL
 
 logger = init_logger(__name__)
 
-
+# 管理每个LLM实例的组件
 class Llumlet:
     def __init__(self,
                  instance_id: str,
@@ -214,6 +214,7 @@ class Llumlet:
     def get_all_request_ids(self) -> List[str]:
         return self.backend_engine.get_all_request_ids()
 
+    # 任务被分配到该实例时，运行这个函数
     def generate(self, request_id: str, server_info: ServerInfo, expected_steps: int, *args, **kwargs) -> None:
         if hasattr(server_info, 'request_timestamps'):
             server_info.request_timestamps.llumlet_generate_timestamp = time.time()

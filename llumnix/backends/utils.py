@@ -71,6 +71,7 @@ class AsyncPutQueueActor:
                 request_ids = [req_output.request_id for req_output in req_outputs]
                 self.engine_actor_handle.abort.remote(request_ids)
 
+# 根据参数决定使用那种LLM后端，并返回
 def init_backend_engine(instance_id: str,
                         placement_group: PlacementGroup,
                         request_output_queue_type: QueueType,

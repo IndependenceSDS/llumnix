@@ -213,6 +213,7 @@ class Launcher:
         fastapi_server = APIServerActor.from_args(server_name, placement_group, entrypoints_args)
         return fastapi_server
 
+    # 创建实例
     def init_instance(self,
                        instance_id: str,
                        instance_args: InstanceArgs,
