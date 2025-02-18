@@ -43,9 +43,11 @@ llumnix_client: LlumnixClientVLLM = None
 # pylint: disable=unused-argument
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
+    # yeild之前的部分是服务器启动时执行的
     asyncio.create_task(llumnix_client.request_output_queue.run_server_loop())
     asyncio.create_task(llumnix_client.get_request_outputs_loop())
     yield
+    # yield之后的是服务器关闭时执行的
     llumnix_client.request_output_queue.cleanup()
 
 app = FastAPI(lifespan=lifespan)
@@ -56,7 +58,7 @@ async def health() -> Response:
     """Health check."""
     return Response(status_code=200)
 
-
+# 通过generate，用户提交推理申请
 @app.post("/generate")
 async def generate(request: Request) -> Response:
     """Generate completion for the request.
@@ -102,6 +104,7 @@ async def generate(request: Request) -> Response:
     text_outputs = [prompt + output.text for output in final_output.outputs]
     ret = {"text": text_outputs}
     return JSONResponse(ret)
+
 
 @app.post("/generate_benchmark")
 async def generate_benchmark(request: Request) -> Response:
@@ -169,6 +172,7 @@ async def is_ready() -> bool:
 
 
 if __name__ == "__main__":
+    # 程序入口
     parser: LlumnixArgumentParser = LlumnixArgumentParser()
 
     parser.add_argument("--host", type=str)

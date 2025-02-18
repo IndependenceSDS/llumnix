@@ -19,7 +19,7 @@ from llumnix.constants import WAIT_MANAGER_INTERVAL
 
 logger = init_logger(__name__)
 
-
+# 该类是llumlet
 class LlumnixClientVLLM:
     def __init__(self,
                  entrypoints_context: EntrypointsContext):
@@ -36,7 +36,9 @@ class LlumnixClientVLLM:
             self.instance_num_requests[ins_id] = 0
         self.num_finished_requests = 0
         self.manager_available = True
-
+    '''
+    当有用户访问服务器的时候，这个函数会被调用
+    '''
     async def generate(self,
                        prompt: str,
                        sampling_params: SamplingParams,
@@ -63,7 +65,7 @@ class LlumnixClientVLLM:
             await self._generate_by_instance(request_id, server_info_copy, prompt, sampling_params, *args, **kwargs)
 
         return results_generator
-
+    # 将请求转发给manager去分配
     async def _generate_by_manager(self,
                                    request_id: str,
                                    server_info: ServerInfo,
@@ -125,17 +127,21 @@ class LlumnixClientVLLM:
         return ready_status
 
     # TODO(s5u13b): Fix the potential output token out-of-order issue caused by the migration.
+    # 循环获取输出
     async def get_request_outputs_loop(self):
         while True:
             request_outputs = await self.request_output_queue.get()
+            # 打上接收时间戳，可能是为了计算时延等用途
             for request_output in request_outputs:
                 if hasattr(request_output, 'request_timestamps'):
                     request_output.request_timestamps.api_server_background_process_get_queue_timestamp = time.time()
+            # 
             for request_output in request_outputs:
                 request_id = request_output.request_id
                 # Request could be dispatched twice when manager is dead, the first request will free the request_streams when finished.
                 if request_id not in self.request_streams:
                     continue
+                # 将输出放在输出流里（vllm的AsyncStream，基于asyncio.Queue实现）
                 self.request_streams[request_id].put(request_output)
                 if request_output.finished:
                     self.request_streams[request_id].finish()

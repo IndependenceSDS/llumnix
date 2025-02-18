@@ -25,14 +25,17 @@ from llumnix.arg_utils import InstanceArgs
 
 logger = init_logger(__name__)
 
-
+# 全局调度器
 class GlobalScheduler:
     def __init__(self, global_scheduler_config: GlobalSchedulerConfig) -> None:
         self.global_scheduler_config = global_scheduler_config
         self.num_instances = 0
         self.instance_id_set: Set[str] = set()
         self.instance_info: Dict[str, InstanceInfo] = {}
-
+        '''FIXME:有个问题，DispatchScheduler在初始化的时候确认策略，并且没有办法修改，
+        也就是说一次部署只能设定一个确定的策略
+        '''
+        # 初始化三个子调度器
         # dispatch args
         self.dispatch_scheduler = DispatchScheduler(global_scheduler_config.dispatch_policy)
         # migrate args
@@ -51,8 +54,11 @@ class GlobalScheduler:
             if instance_info.instance_id in self.instance_id_set:
                 self.instance_info[instance_info.instance_id] = instance_info
 
+    # 请求分配
     def dispatch(self) -> str:
+        # 分配前更新
         self.dispatch_scheduler.update_instance_infos(self.instance_info)
+        # 让调遣调度器决定分配的目标实例id
         instance_id = self.dispatch_scheduler.dispatch()
         request_expected_steps = 1 if self.global_scheduler_config.enable_pd_disagg else math.inf
         return instance_id, request_expected_steps

@@ -22,21 +22,25 @@ from llumnix.constants import DISPATCH_LOG_FREQUENCY
 
 logger = init_logger(__name__)
 
-
+# 请求调遣分配器
 class DispatchScheduler:
     def __init__(self, dispatch_policy: str,) -> None:
+        # 按照参数选择策略
         self.dispatch_policy = DispatchPolicyFactory.get_policy(dispatch_policy)
         self.available_dispatch_instance_set: Set[str] = set()
         self.instance_info: Dict[str, InstanceInfo] = {}
         # statistics
         self.total_num_requests = 0
         self.instance_num_requests: Dict[str, int] = {}
-
+    # 决定分配到哪个instance
     def dispatch(self) -> str:
         self.total_num_requests += 1
+        # 按照策略，根据实例数量和内存占用状况，返回一个目标实例id
         dispatch_instance_id = self.dispatch_policy.dispatch(self.instance_num_requests,
                                                              self.instance_info.values())
+        # 更新该实例的当前请求数量
         self.instance_num_requests[dispatch_instance_id] += 1
+        # 更新日志
         if self.total_num_requests % DISPATCH_LOG_FREQUENCY == 0:
             logger.info("dispatch scheduler total_dispatched_requests: {}".format(self.total_num_requests))
             for instance_id, num_requests in self.instance_num_requests.items():
@@ -124,6 +128,7 @@ class RoundRobin(DispatchPolicy):
         return target_instance_id
 
 class DispatchPolicyFactory:
+    # 这里有5个不同的策略
     _POLICY_REGISTRY = {
         'flood': Flood,
         'balanced': Balanced,

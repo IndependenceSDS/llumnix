@@ -145,6 +145,7 @@ class Manager:
             if self.manager_args.enable_pd_disagg:
                 asyncio.create_task(self._check_pd_deployment_states_loop(CHECK_DEPLOYMENT_STATES_INTERVAL))
 
+    # manager管理request的分发和执行
     async def generate(self, request_id: str, server_info: ServerInfo, *args, **kwargs,) -> None:
         while self.num_instances == 0:
             logger.warning("No instance available now, sleep {}s, "
@@ -155,6 +156,7 @@ class Manager:
         try:
             if hasattr(server_info, 'request_timestamps'):
                 server_info.request_timestamps.manager_generate_timestamp = time.time()
+            # 调用对应instance的generate
             await self.instances[instance_id].generate.remote(request_id, server_info, request_expected_steps, *args, **kwargs)
             if self.log_requests:
                 logger.info("manager receive request {}".format(request_id))
@@ -236,6 +238,7 @@ class Manager:
         else:
             asyncio.create_task(self._migrate(PairMigrationConstraints.NO_CONSTRAINTS))
 
+    # 迁移动作
     async def _migrate(self, pair_migration_type: PairMigrationConstraints) -> None:
         # TODO(s5u13b): Remove the migration done callback through decentralized migration refactoring.
         async def migrate_done_callback(ret, migrate_instance_pair: Tuple[str, str]) -> None:
@@ -515,7 +518,7 @@ class Manager:
             launch_args,
             os.getcwd())
         return manager
-
+    # 初始化instance
     def init_instances(self,
                        request_output_queue_type: QueueType,
                        backend_type: BackendType,

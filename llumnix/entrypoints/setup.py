@@ -163,6 +163,7 @@ def _setup_llumnix_local(entrypoints_args, manager_args, instance_args, engine_a
 def _setup_llumnix_global(entrypoints_args, manager_args, instance_args, engine_args, launch_args) -> None:
     _ = init_manager(manager_args, instance_args, entrypoints_args, engine_args, launch_args)
 
+# 创建manager和输出队列等初始化操作
 def setup_llumnix(entrypoints_args, manager_args, instance_args, engine_args, launch_args) -> Optional[EntrypointsContext]:
     if launch_args.launch_mode == LaunchMode.LOCAL:
         return _setup_llumnix_local(entrypoints_args, manager_args, instance_args, engine_args, launch_args)

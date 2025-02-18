@@ -23,6 +23,7 @@ from llumnix.logging.logger import init_logger
 
 logger = init_logger(__name__)
 
+# 初始化双端请求输出队列
 
 def init_request_output_queue_server(zmq_ip: str, zmq_port: int, queue_type: QueueType) -> QueueServerBase:
     output_queue_server: QueueServerBase = None
