@@ -1,6 +1,7 @@
 from typing import List
 import os
 import asyncio
+import time
 
 import ray
 
@@ -13,13 +14,22 @@ from llumnix.queue.ray_queue_server import RayQueueServer
 
 from tests.conftest import cleanup_ray_env_func
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
 # Sample prompts.
 prompts = [
-    "Hello, my name is",
-    "The president of the United States is",
-    "The capital of France is",
-    "The future of AI is",
+    """
+You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
+
+If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.
+
+Explain superconductors like I'\''m five years old""",
+    
 ]
+
+# "The president of the United States is",
+#     "The capital of France is",
+#     "The future of AI is",
 
 # Create a sampling params object.
 sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
@@ -34,10 +44,11 @@ launch_ray_cluster(port=ray_cluster_port)
 connect_to_ray_cluster(port=ray_cluster_port)
 
 # Set manager args and engine args.
-manager_args = ManagerArgs()
-instance_args = InstanceArgs()
-engine_args = EngineArgs(model="facebook/opt-125m", worker_use_ray=True,
-                         trust_remote_code=True, max_model_len=370)
+manager_args = ManagerArgs(enable_pd_disagg=False)
+instance_args = InstanceArgs(migration_backend="nccl")
+# /mnt/sda1/cgg/deepseekR1-14b
+engine_args = EngineArgs(model="/mnt/sda1/cgg/deepseekR1-14b", worker_use_ray=True,
+                         trust_remote_code=True, max_model_len=2048)
 
 # Create a manager. If the manager is created first, and then the instances are created.
 manager: Manager = init_manager(manager_args)
@@ -46,8 +57,15 @@ ray.get(manager.is_ready.remote())
 # Create instances.
 instance_ids: List[str] = None
 instances: List[Llumlet] = None
+
+
+start_time = time.perf_counter()
 instance_ids, instances = ray.get(manager.init_instances.remote(
     QueueType("rayqueue"), BackendType.VLLM, instance_args, engine_args))
+
+end_time = time.perf_counter()
+elapsed_time = end_time - start_time
+print(f"instance initial time: {elapsed_time:.6f} seconds")
 
 # The requests‘ outputs will be put to the request_output_queue no matter which instance it's running in.
 server_id = random_uuid()

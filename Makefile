@@ -19,6 +19,10 @@ init:
 vllm_install:
 	@pip install -e .[vllm]
 
+.PHONY: llumnix_install
+vllm_install:
+	@pip install -e .
+
 .PHONY: lint
 lint: check_pylint_installed check_pytest_installed
 	@pylint --rcfile=.pylintrc -s n --jobs=128 ./llumnix

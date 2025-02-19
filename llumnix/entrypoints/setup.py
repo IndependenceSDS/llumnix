@@ -129,6 +129,7 @@ def init_llumnix_components(entrypoints_args: EntrypointsArgs,
     end_time = time.perf_counter()
     elapsed_time = end_time - start_time
     print(f"instance initial time: {elapsed_time:.6f} seconds")
+    logger.info(f"instance initial time: {elapsed_time:.6f} seconds")
 
     ip = get_ip_address()
     request_output_queue_port: str = entrypoints_args.request_output_queue_port

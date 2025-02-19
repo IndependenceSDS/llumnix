@@ -45,6 +45,8 @@ from llumnix.constants import (CLEAR_REQUEST_INSTANCE_INTERVAL, NO_INSTANCE_RETR
                                WATCH_DEPLOYMENT_INTERVAL, WATCH_DEPLOYMENT_INTERVAL_PENDING_INSTANCE)
 from llumnix.launcher import Launcher
 
+from llumnix import EngineArgs
+
 logger = init_logger(__name__)
 
 # TODO(s5u13b): Handle exception of ray operations.
@@ -141,7 +143,8 @@ class Manager:
         if hasattr(self, "launch_mode") and self.launch_mode == LaunchMode.GLOBAL:
             assert self.entrypoints_args is not None and self.engine_args is not None
             self.last_timeout_instance_id = None
-            asyncio.create_task(self._auto_scale_up_loop(AUTO_SCALE_UP_INTERVAL))
+            # 为了避免干扰,关闭自动扩缩容
+            # asyncio.create_task(self._auto_scale_up_loop(AUTO_SCALE_UP_INTERVAL))
             asyncio.create_task(self._check_deployment_states_loop(CHECK_DEPLOYMENT_STATES_INTERVAL))
             if self.manager_args.enable_pd_disagg:
                 asyncio.create_task(self._check_pd_deployment_states_loop(CHECK_DEPLOYMENT_STATES_INTERVAL))
@@ -238,7 +241,30 @@ class Manager:
     # 抢占模拟测试迁移
     async def _preempt_migrate(self) -> None:
         # 创建一个新实例
+        try:
+            new_pg = None
+            new_instance_id = random_uuid()
+            new_pg = self.launcher.init_placement_group(get_placement_group_name(new_instance_id), self.engine_args, self.backend_type,
+                                                        init_server=True, block=False)
+            try:
+                await asyncio.wait_for(new_pg.ready(), WAIT_PLACEMENT_GROUP_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.debug("Waiting for new placement group {} ready timeout.".format(new_instance_id))
+                # After timeout, the new placement group might be pending,
+                # created(without server and instance), rescheduling.
+                self.last_timeout_instance_id = new_instance_id
+                await asyncio.sleep(10)
+                return
+            self.launcher.init_server_and_instance(new_instance_id, self.entrypoints_args, self.instance_args,
+                                                       self.engine_args, self.backend_type, new_pg,
+                                                       instance_finish_cb=self.scale_up)
+            logger.info("Deploy server and instance to new placement group done, instance_id: {}.".format(new_instance_id))
+        # pylint: disable=broad-except
+        except Exception as e:
+            logger.error("Unexpected exception: {}".format(e))
+            logger.error("Exception traceback: {}".format(traceback.format_exc()))     
         # 发起迁移请求
+        
         pass
     
     
@@ -313,6 +339,7 @@ class Manager:
         while True:
             try:
                 new_pg = None
+                # 检测有没有实例挂了
                 if self.last_timeout_instance_id is not None:
                     last_timeout_pg_name = get_placement_group_name(self.last_timeout_instance_id)
                     last_timeout_pg_states = list_placement_groups(filters=[("name", "=", last_timeout_pg_name)])
@@ -322,10 +349,12 @@ class Manager:
                         new_pg = ray.util.get_placement_group(last_timeout_pg_name)
                     # reset
                     self.last_timeout_instance_id = None
+                # 获取空闲的实例
                 pending_pg_states = list_placement_groups(filters=[("state", "=", "PENDING")])
                 pending_pg_states.extend(list_placement_groups(filters=[("state", "=", "RESCHEDULING")]))
                 for pending_pg_state in pending_pg_states:
                     instance_id = pending_pg_state["name"].split("_")[-1]
+                    # 如果有实例挂了并且该实例是新实例,才不进行scale_down
                     if new_pg is not None and instance_id == new_instance_id:
                         continue
                     self.scale_down(instance_id)
@@ -447,6 +476,7 @@ class Manager:
 
         return self.num_instances
 
+    # 删除特定id的instance
     def scale_down(self, instance_id: Union[str, Iterable[str]], rebuild_migration_backend: bool = True) -> None:
         if isinstance(instance_id, str):
             instance_id = [instance_id,]
