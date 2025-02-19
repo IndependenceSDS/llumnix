@@ -19,7 +19,7 @@ from llumnix.constants import WAIT_MANAGER_INTERVAL
 
 logger = init_logger(__name__)
 
-# 该类是llumlet
+# 该类是apiserver的llumlet
 class LlumnixClientVLLM:
     def __init__(self,
                  entrypoints_context: EntrypointsContext):

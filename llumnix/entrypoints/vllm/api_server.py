@@ -58,6 +58,19 @@ async def health() -> Response:
     """Health check."""
     return Response(status_code=200)
 
+
+# 测试: 模拟抢占实例被抢占时发生的迁移
+@app.post("/migrate")
+async def generate(request: Request) -> Response:
+    """test of migration when the spot instance is preempted
+
+    """
+    
+    ret = {"text": text_outputs}
+    return JSONResponse(ret)
+
+
+
 # 通过generate，用户提交推理申请
 @app.post("/generate")
 async def generate(request: Request) -> Response:

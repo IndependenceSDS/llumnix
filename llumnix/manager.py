@@ -221,17 +221,27 @@ class Manager:
                     tasks.append(task)
                 await asyncio.gather(*tasks, return_exceptions=True)
                 self.num_instance_info_updates += 1
-                # 迁移启动起点
+                # 迁移启动起点,定期迁移
+                # 防止干扰,禁用原有的自动定期迁移
                 # Push migrate when the instance_info have updated a certain number of times.
-                if self.enable_migration and self.num_instance_info_updates != 0 \
-                    and self.num_instance_info_updates % self.pair_migration_frequency == 0:
-                    asyncio.create_task(self._push_migrations())
+                # if self.enable_migration and self.num_instance_info_updates != 0 \
+                #     and self.num_instance_info_updates % self.pair_migration_frequency == 0:
+                #     asyncio.create_task(self._push_migrations())
                 if self.log_instance_info:
                     self._log_instance_infos_to_csv(instance_infos)
             # pylint: disable=W0703
             except Exception as e:
                 logger.error("Unexpected exception: {}".format(e))
                 logger.error("Exception traceback: {}".format(traceback.format_exc()))
+                
+    
+    # 抢占模拟测试迁移
+    async def _preempt_migrate(self) -> None:
+        # 创建一个新实例
+        # 发起迁移请求
+        pass
+    
+    
     # manager的迁移入口
     async def _push_migrations(self) -> None:
         if self.enable_pd_disagg:

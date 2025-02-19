@@ -121,9 +121,14 @@ def init_llumnix_components(entrypoints_args: EntrypointsArgs,
 
     backend_type: BackendType = launch_args.backend_type
     request_output_queue_type: QueueType = QueueType(entrypoints_args.request_output_queue_type)
+    # 测试初始化实例时间 
+    start_time = time.perf_counter()
     instance_ids, instances = retry_manager_method_sync(
         manager.init_instances.remote, 'init_instances', request_output_queue_type,
         backend_type, instance_args, engine_args)
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"instance initial time: {elapsed_time:.6f} seconds")
 
     ip = get_ip_address()
     request_output_queue_port: str = entrypoints_args.request_output_queue_port
