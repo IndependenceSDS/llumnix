@@ -281,11 +281,14 @@ class Manager:
             migration_tasks = []
             for _, migrate_instance_pair in enumerate(migrate_instance_pairs):
                 migrate_out_instance_id, migrate_in_instance_id = migrate_instance_pair
+                # 如果有一端当前正在迁移,就暂时跳过
                 if self.instance_migrating[migrate_out_instance_id] or self.instance_migrating[migrate_in_instance_id]:
                     continue
+                # 设置状态为正在迁移
                 self.instance_migrating[migrate_out_instance_id] = True
                 self.instance_migrating[migrate_in_instance_id] = True
                 migrate_in_instance_name = get_instance_name(migrate_in_instance_id)
+                # 调用迁出端instance的migrate_out
                 task = asyncio.gather(self.instances[migrate_out_instance_id].migrate_out.remote(migrate_in_instance_name),
                                       return_exceptions=True)
                 task.add_done_callback(partial(migrate_done_callback_wrapper, migrate_instance_pair))

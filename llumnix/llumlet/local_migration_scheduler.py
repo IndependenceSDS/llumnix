@@ -17,9 +17,10 @@ import numpy as np
 from llumnix.llumlet.request import LlumnixRequest, RequestStatus, RequestInferenceType
 from llumnix.backends.backend_interface import BackendInterface
 
-
+# llumlet维护的本地迁移调度器,该调度器只负责按照初始化时指定的策略返回需要迁出的实例
 class LocalMigrationScheduler:
     def __init__(self, request_migration_policy: str, backend_engine: BackendInterface) -> None:
+        # 迁移策略是初始化时选定的
         self.request_migration_policy = request_migration_policy
         self.backend_engine = backend_engine
 

@@ -69,6 +69,7 @@ class Llumlet:
                                                                         backend_type,
                                                                         engine_args,
                                                                         instance_args.profiling_result_file_path)
+            # llumlet的迁移协调器和本地迁移调度器
             self.migration_coordinator = MigrationCoordinator(self.backend_engine,
                                                               migration_config.migration_last_stage_max_blocks,
                                                               migration_config.migration_max_stages)
@@ -140,11 +141,12 @@ class Llumlet:
                 ray.kill(self_actor)
 
     async def migrate_out(self, dst_instance_name: str) -> List[str]:
+        # 让llumlet自己维护的本地迁移调度器决定需要迁移出的请求
         migrate_out_requests = self.migration_scheduler.get_migrate_out_requests()
 
         if len(migrate_out_requests) == 0:
             return []
-
+        # 标记为正在迁移
         for migrate_out_request in migrate_out_requests:
             migrate_out_request.is_migrating = True
 
@@ -156,6 +158,7 @@ class Llumlet:
                 break
         return migrated_request_list
 
+    # 迁出一个请求
     async def _migrate_out_one_request(self, migrate_out_request: LlumnixRequest, dst_instance_name: str) -> List[LlumnixRequest]:
         try:
             t0 = time.time()

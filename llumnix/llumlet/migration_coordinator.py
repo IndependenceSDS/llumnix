@@ -41,6 +41,7 @@ class MigrationStatus(enum.Enum):
             MigrationStatus.FINISHED
         ]
 
+# llumlet维护的本地迁移协调器,负责迁移核心功能的执行
 class MigrationCoordinator:
     def __init__(self,
                  backend_engine: BackendInterface,
