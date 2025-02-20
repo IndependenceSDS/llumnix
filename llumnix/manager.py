@@ -70,6 +70,7 @@ class Manager:
                         self.job_id, self.worker_id, self.actor_id, self.node_id))
         self.actor_name = get_manager_name()
         self.manager_args = manager_args
+        self.cgg_migration = False
 
         # used in global deployment.
         self.entrypoints_args = entrypoints_args
@@ -161,6 +162,7 @@ class Manager:
             if hasattr(server_info, 'request_timestamps'):
                 server_info.request_timestamps.manager_generate_timestamp = time.time()
             # 调用对应instance的generate
+            self.cgg_migration=True
             await self.instances[instance_id].generate.remote(request_id, server_info, request_expected_steps, *args, **kwargs)
             if self.log_requests:
                 logger.info("manager receive request {}".format(request_id))
@@ -169,6 +171,26 @@ class Manager:
         except (ray.exceptions.RayActorError, KeyError):
             logger.info("Instance {} is dead, regenerate request {}.".format(instance_id, request_id))
             self.scale_down(instance_id)
+    
+    # async def generate_to_instance(self, request_id: str, server_info: ServerInfo, instance_id: Union[str, Iterable[str]], *args, **kwargs,) -> None:
+    #     while self.num_instances == 0:
+    #         logger.warning("No instance available now, sleep {}s, "
+    #                        "and regenerate request {}.".format(NO_INSTANCE_RETRY_INTERVAL, request_id))
+    #         await asyncio.sleep(NO_INSTANCE_RETRY_INTERVAL)
+
+    #     instance_id, request_expected_steps = self.global_scheduler.dispatch()
+    #     try:
+    #         if hasattr(server_info, 'request_timestamps'):
+    #             server_info.request_timestamps.manager_generate_timestamp = time.time()
+    #         # 调用对应instance的generate
+    #         await self.instances[instance_id].generate.remote(request_id, server_info, request_expected_steps, *args, **kwargs)
+    #         if self.log_requests:
+    #             logger.info("manager receive request {}".format(request_id))
+    #             logger.info("dispath request {} to instance {}".format(request_id, instance_id))
+    #             self.request_instance[request_id] = instance_id
+    #     except (ray.exceptions.RayActorError, KeyError):
+    #         logger.info("Instance {} is dead, regenerate request {}.".format(instance_id, request_id))
+    #         self.scale_down(instance_id)
 
     async def abort(self, request_id: Union[str, Iterable[str]]) -> None:
         def abort_done_callback(instance_id: str, request_ids: List[str], fut):
@@ -290,6 +312,9 @@ class Manager:
                                                        self.engine_args, self.backend_type, new_pg,
                                                        instance_finish_cb=self.scale_up)
             logger.info("Deploy server and instance to new placement group done, instance_id: {}.".format(new_instance_id))
+            while not self.cgg_migration:
+                time.sleep(0.1)
+            time.sleep(3)
             # 发起迁移请求
             # 由调度器决定迁移的实例对
             migrate_instance_pairs = [(old_instance_id,new_instance_id)]

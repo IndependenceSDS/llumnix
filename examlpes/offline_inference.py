@@ -14,7 +14,7 @@ from llumnix.queue.ray_queue_server import RayQueueServer
 
 from tests.conftest import cleanup_ray_env_func
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 # Sample prompts.
 prompts = [
@@ -32,7 +32,7 @@ Explain superconductors like I'\''m five years old""",
 #     "The future of AI is",
 
 # Create a sampling params object.
-sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
+sampling_params = SamplingParams(temperature=0.8, top_p=0.95,max_tokens=2048)
 
 # Launch ray cluster
 os.environ['HEAD_NODE'] = '1'
@@ -48,7 +48,8 @@ manager_args = ManagerArgs(enable_pd_disagg=False)
 instance_args = InstanceArgs(migration_backend="nccl")
 entrypoints_args = EntrypointsArgs()
 # /mnt/sda1/cgg/deepseekR1-14b
-engine_args = EngineArgs(model="/mnt/sda1/cgg/opt6.7b", worker_use_ray=True,
+# /mnt/sda1/cgg/opt6.7b
+engine_args = EngineArgs(model="/mnt/sda1/cgg/deepseekR1-14b", worker_use_ray=True,
                          trust_remote_code=True, max_model_len=2048)
 launch_args=LaunchArgs(LaunchMode.LOCAL, BackendType.VLLM)
 # launch_mode="LOCAL",backend_type="VLLM"
@@ -94,12 +95,13 @@ async def main():
 
     for request in prompts:
         request_id = random_uuid()
+        ray.get(manager._preempt_migrate.remote(instance_ids[0]))
+        time.sleep(30)
         await manager.generate.remote(request_id=request_id,
                                       server_info=server_info,
                                       prompt=request,
                                       params=sampling_params,)
-        time.sleep(1)
-        ray.get(manager._preempt_migrate.remote(instance_ids[0]))
+        
 
     await output_task
 
