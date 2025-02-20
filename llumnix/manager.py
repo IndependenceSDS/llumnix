@@ -239,7 +239,38 @@ class Manager:
                 
     
     # 抢占模拟测试迁移
-    async def _preempt_migrate(self) -> None:
+    async def _preempt_migrate(self, old_instance_id: Union[str, Iterable[str]]) -> None:
+        async def migrate_done_callback(ret, migrate_instance_pair: Tuple[str, str]) -> None:
+            if migrate_instance_pair[0] in self.instance_migrating:
+                self.instance_migrating[migrate_instance_pair[0]] = False
+            if migrate_instance_pair[1] in self.instance_migrating:
+                self.instance_migrating[migrate_instance_pair[1]] = False
+            if isinstance(ret, (ray.exceptions.RayActorError, ray.exceptions.RayTaskError, KeyError)):
+                has_error_pair = await self._check_instance_error(migrate_instance_pair)
+                for i, has_error in enumerate(has_error_pair):
+                    # Instance without error should clear migration states.
+                    # TODO(s5u13b): Fix the clear_migration_states to adapt to the many-to-many migration.
+                    if not has_error:
+                        try:
+                            await self.instances[migrate_instance_pair[i]].clear_migration_states.remote(is_migrate_in=bool(i))
+                        except (ray.exceptions.RayActorError, ray.exceptions.RayTaskError, KeyError):
+                            has_error = True
+                for i, has_error in enumerate(has_error_pair):
+                    if has_error:
+                        instance_id = migrate_instance_pair[i]
+                        logger.info("Instance {} is dead.".format(instance_id))
+                        self.scale_down(instance_id)
+            else:
+                migrate_out_request_ids = ret[0]
+                if migrate_out_request_ids:
+                    migrate_out_request_id = migrate_out_request_ids[0]
+                    self.request_instance[migrate_out_request_id] = migrate_instance_pair[1]
+                logger.info("instance {}->{} migrate done, migrate request {}".format(
+                    migrate_instance_pair[0], migrate_instance_pair[1], migrate_out_request_ids))
+        def migrate_done_callback_wrapper(migrate_instance_pair: Tuple[str, str], fut) -> None:
+            ret = fut.result()
+            loop = asyncio.get_event_loop()
+            loop.create_task(migrate_done_callback(ret, migrate_instance_pair))
         # 创建一个新实例
         try:
             new_pg = None
@@ -259,13 +290,32 @@ class Manager:
                                                        self.engine_args, self.backend_type, new_pg,
                                                        instance_finish_cb=self.scale_up)
             logger.info("Deploy server and instance to new placement group done, instance_id: {}.".format(new_instance_id))
+            # 发起迁移请求
+            # 由调度器决定迁移的实例对
+            migrate_instance_pairs = [(old_instance_id,new_instance_id)]
+            migration_tasks = []
+            for _, migrate_instance_pair in enumerate(migrate_instance_pairs):
+                migrate_out_instance_id, migrate_in_instance_id = migrate_instance_pair
+                # 如果有一端当前正在迁移,就暂时跳过
+                if self.instance_migrating[migrate_out_instance_id] or self.instance_migrating[migrate_in_instance_id]:
+                    continue
+                # 设置状态为正在迁移
+                self.instance_migrating[migrate_out_instance_id] = True
+                self.instance_migrating[migrate_in_instance_id] = True
+                migrate_in_instance_name = get_instance_name(migrate_in_instance_id)
+                # 调用迁出端instance的migrate_out
+                task = asyncio.gather(self.instances[migrate_out_instance_id].migrate_out.remote(migrate_in_instance_name),
+                                      return_exceptions=True)
+                task.add_done_callback(partial(migrate_done_callback_wrapper, migrate_instance_pair))
+                migration_tasks.append(task)
+            await asyncio.gather(*migration_tasks, return_exceptions=True)
+            
         # pylint: disable=broad-except
         except Exception as e:
             logger.error("Unexpected exception: {}".format(e))
             logger.error("Exception traceback: {}".format(traceback.format_exc()))     
-        # 发起迁移请求
         
-        pass
+        
     
     
     # manager的迁移入口

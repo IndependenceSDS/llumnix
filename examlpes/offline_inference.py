@@ -96,6 +96,8 @@ async def main():
                                       server_info=server_info,
                                       prompt=request,
                                       params=sampling_params,)
+        time.sleep(1)
+        ray.get(manager._preempt_migrate.remote(instance_ids[0]))
 
     await output_task
 
