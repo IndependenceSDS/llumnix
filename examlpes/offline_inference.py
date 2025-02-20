@@ -7,7 +7,7 @@ import ray
 
 from llumnix import launch_ray_cluster, connect_to_ray_cluster, init_manager
 from llumnix import (ManagerArgs, InstanceArgs, EngineArgs, Manager,
-                     Llumlet, ServerInfo, QueueType, BackendType,
+                     Llumlet, ServerInfo, QueueType, BackendType,LaunchArgs,LaunchMode,EntrypointsArgs,
                      SamplingParams)
 from llumnix.utils import random_uuid
 from llumnix.queue.ray_queue_server import RayQueueServer
@@ -46,12 +46,14 @@ connect_to_ray_cluster(port=ray_cluster_port)
 # Set manager args and engine args.
 manager_args = ManagerArgs(enable_pd_disagg=False)
 instance_args = InstanceArgs(migration_backend="nccl")
+entrypoints_args = EntrypointsArgs()
 # /mnt/sda1/cgg/deepseekR1-14b
-engine_args = EngineArgs(model="/mnt/sda1/cgg/deepseekR1-14b", worker_use_ray=True,
+engine_args = EngineArgs(model="/mnt/sda1/cgg/opt6.7b", worker_use_ray=True,
                          trust_remote_code=True, max_model_len=2048)
-
+launch_args=LaunchArgs(LaunchMode.LOCAL, BackendType.VLLM)
+# launch_mode="LOCAL",backend_type="VLLM"
 # Create a manager. If the manager is created first, and then the instances are created.
-manager: Manager = init_manager(manager_args)
+manager: Manager = init_manager(manager_args,instance_args,entrypoints_args,engine_args=engine_args,launch_args=launch_args)
 ray.get(manager.is_ready.remote())
 
 # Create instances.

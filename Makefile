@@ -20,7 +20,7 @@ vllm_install:
 	@pip install -e .[vllm]
 
 .PHONY: llumnix_install
-vllm_install:
+llumnix_install:
 	@pip install -e .
 
 .PHONY: lint
