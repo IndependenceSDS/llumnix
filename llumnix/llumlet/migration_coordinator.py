@@ -98,8 +98,10 @@ class MigrationCoordinator:
         """
         try:
             stage_count = 0
+            logger.info("multistage migration begin!")
             while stage_count < self.migration_max_stages:
                 stage_count += 1
+                logger.info("migration stage {}:".format(stage_count))
                 status = await self._migrate_out_onestage(migrate_in_ray_actor, migrate_out_request)
                 if MigrationStatus.is_finished(status):
                     return status

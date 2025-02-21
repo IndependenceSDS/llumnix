@@ -258,10 +258,36 @@ class Manager:
             except Exception as e:
                 logger.error("Unexpected exception: {}".format(e))
                 logger.error("Exception traceback: {}".format(traceback.format_exc()))
-                
+    
+    async def create_new_instance(self) -> str:
+        # 创建一个新实例
+        try:
+            new_pg = None
+            new_instance_id = random_uuid()
+            new_pg = self.launcher.init_placement_group(get_placement_group_name(new_instance_id), self.engine_args, self.backend_type,
+                                                        init_server=True, block=False)
+            try:
+                await asyncio.wait_for(new_pg.ready(), WAIT_PLACEMENT_GROUP_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.debug("Waiting for new placement group {} ready timeout.".format(new_instance_id))
+                # After timeout, the new placement group might be pending,
+                # created(without server and instance), rescheduling.
+                self.last_timeout_instance_id = new_instance_id
+                await asyncio.sleep(10)
+                return
+            self.launcher.init_server_and_instance(new_instance_id, self.entrypoints_args, self.instance_args,
+                                                       self.engine_args, self.backend_type, new_pg,
+                                                       instance_finish_cb=self.scale_up)
+            logger.info("Deploy server and instance to new placement group done, instance_id: {}.".format(new_instance_id))
+            return new_instance_id
+        # pylint: disable=broad-except
+        except Exception as e:
+            logger.error("Unexpected exception: {}".format(e))
+            logger.error("Exception traceback: {}".format(traceback.format_exc()))     
+    
     
     # 抢占模拟测试迁移
-    async def _preempt_migrate(self, old_instance_id: Union[str, Iterable[str]]) -> None:
+    async def preempt_migrate(self, old_instance_id: Union[str, Iterable[str]],new_instance_id: Union[str, Iterable[str]]) -> None:
         async def migrate_done_callback(ret, migrate_instance_pair: Tuple[str, str]) -> None:
             if migrate_instance_pair[0] in self.instance_migrating:
                 self.instance_migrating[migrate_instance_pair[0]] = False
@@ -293,28 +319,7 @@ class Manager:
             ret = fut.result()
             loop = asyncio.get_event_loop()
             loop.create_task(migrate_done_callback(ret, migrate_instance_pair))
-        # 创建一个新实例
         try:
-            new_pg = None
-            new_instance_id = random_uuid()
-            new_pg = self.launcher.init_placement_group(get_placement_group_name(new_instance_id), self.engine_args, self.backend_type,
-                                                        init_server=True, block=False)
-            try:
-                await asyncio.wait_for(new_pg.ready(), WAIT_PLACEMENT_GROUP_TIMEOUT)
-            except asyncio.TimeoutError:
-                logger.debug("Waiting for new placement group {} ready timeout.".format(new_instance_id))
-                # After timeout, the new placement group might be pending,
-                # created(without server and instance), rescheduling.
-                self.last_timeout_instance_id = new_instance_id
-                await asyncio.sleep(10)
-                return
-            self.launcher.init_server_and_instance(new_instance_id, self.entrypoints_args, self.instance_args,
-                                                       self.engine_args, self.backend_type, new_pg,
-                                                       instance_finish_cb=self.scale_up)
-            logger.info("Deploy server and instance to new placement group done, instance_id: {}.".format(new_instance_id))
-            while not self.cgg_migration:
-                time.sleep(0.1)
-            time.sleep(3)
             # 发起迁移请求
             # 由调度器决定迁移的实例对
             migrate_instance_pairs = [(old_instance_id,new_instance_id)]
@@ -329,6 +334,7 @@ class Manager:
                 self.instance_migrating[migrate_in_instance_id] = True
                 migrate_in_instance_name = get_instance_name(migrate_in_instance_id)
                 # 调用迁出端instance的migrate_out
+                logger.info("miration begin!")
                 task = asyncio.gather(self.instances[migrate_out_instance_id].migrate_out.remote(migrate_in_instance_name),
                                       return_exceptions=True)
                 task.add_done_callback(partial(migrate_done_callback_wrapper, migrate_instance_pair))

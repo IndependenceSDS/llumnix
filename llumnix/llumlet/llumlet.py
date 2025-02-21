@@ -145,7 +145,9 @@ class Llumlet:
         migrate_out_requests = self.migration_scheduler.get_migrate_out_requests()
 
         if len(migrate_out_requests) == 0:
+            logger.info("no instance to migrat.")
             return []
+        logger.info("the request to migrate is {}".format(migrate_out_requests))
         # 标记为正在迁移
         for migrate_out_request in migrate_out_requests:
             migrate_out_request.is_migrating = True
@@ -168,9 +170,11 @@ class Llumlet:
             migrated_request = []
 
             if migrate_out_request.status == RequestStatus.RUNNING:
+                logger.info("request is running!")
                 migrate_out_request.migration_start_time = time.time()
                 status = await self.migration_coordinator.migrate_out_running_request(migrate_in_ray_actor, migrate_out_request)
             elif migrate_out_request.status == RequestStatus.WAITING:
+                logger.info("request is waiting!")
                 migrate_out_request.migration_start_time = time.time()
                 status = await self.migration_coordinator.migrate_out_waiting_request(migrate_in_ray_actor, migrate_out_request)
             else:

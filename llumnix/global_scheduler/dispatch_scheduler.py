@@ -30,6 +30,7 @@ class DispatchScheduler:
         # 为了测试，暂时采用我编写的alwaysfirst策略
         self.dispatch_policy = DispatchPolicyFactory.get_policy('first')
         self.available_dispatch_instance_set: Set[str] = set()
+        self.instance_list=[]
         self.instance_info: Dict[str, InstanceInfo] = {}
         # statistics
         self.total_num_requests = 0
@@ -37,10 +38,13 @@ class DispatchScheduler:
     # 决定分配到哪个instance
     def dispatch(self) -> str:
         self.total_num_requests += 1
+        logger.info("instance number is: {}".format(len(self.instance_list)))
+        for id in self.available_dispatch_instance_set:
+            logger.info("there is a instance: {}".format(id))
         # 按照策略，根据实例数量和内存占用状况，返回一个目标实例id
         dispatch_instance_id = self.dispatch_policy.dispatch(self.instance_num_requests,
                                                              self.instance_info.values(),
-                                                             self.available_dispatch_instance_set)
+                                                             self.instance_list)
         # 更新该实例的当前请求数量
         self.instance_num_requests[dispatch_instance_id] += 1
         # 更新日志
@@ -59,11 +63,13 @@ class DispatchScheduler:
     def add_instance(self, instance_id: str, instance_args: InstanceArgs) -> None:
         if instance_args.instance_type in [InstanceType.NO_CONSTRAINTS, InstanceType.PREFILL]:
             self.available_dispatch_instance_set.add(instance_id)
+            self.instance_list.append(instance_id)
             self.instance_num_requests[instance_id] = 0
 
     def remove_instance(self, instance_id: str) -> None:
         if instance_id in self.available_dispatch_instance_set:
             self.available_dispatch_instance_set.remove(instance_id)
+            self.instance_list.remove(instance_id)
             self.instance_num_requests.pop(instance_id, None)
 
 class DispatchPolicy(ABC):
@@ -71,7 +77,7 @@ class DispatchPolicy(ABC):
     def dispatch(self,
                  instance_num_requests: Dict[str, int],
                  available_instance_infos: List[InstanceInfo],
-                 available_dispatch_instance_set: Set[str]) -> str:
+                 available_dispatch_instance_set: List[str]) -> str:
         pass
 
 # Dispatch all requests to a single instance, used only for testing
@@ -79,7 +85,7 @@ class Flood(DispatchPolicy):
     def dispatch(self,
                  instance_num_requests: Dict[str, int],
                  available_instance_infos: List[InstanceInfo],
-                 available_dispatch_instance_set: Set[str]) -> str:
+                 available_dispatch_instance_set: List[str]) -> str:
         instance_id = max(instance_num_requests, key=instance_num_requests.get)
         return instance_id
 
@@ -87,7 +93,7 @@ class Balanced(DispatchPolicy):
     def dispatch(self,
                  instance_num_requests: Dict[str, int],
                  available_instance_infos: List[InstanceInfo],
-                 available_dispatch_instance_set: Set[str]) -> str:
+                 available_dispatch_instance_set: List[str]) -> str:
         # dispatch request according to the number of requests dispatched to instance by manager
         instance_id = min(instance_num_requests, key=instance_num_requests.get)
         return instance_id
@@ -96,7 +102,7 @@ class Load(DispatchPolicy):
     def dispatch(self,
                  instance_num_requests: Dict[str, int],
                  available_instance_infos: List[InstanceInfo],
-                 available_dispatch_instance_set: Set[str]) -> str:
+                 available_dispatch_instance_set: List[str]) -> str:
         sorted_instance_infos = sorted(
             available_instance_infos,
             key=lambda instance_info: getattr(instance_info, 'dispatch_load_metric'),
@@ -109,7 +115,7 @@ class Queue(DispatchPolicy):
     def dispatch(self,
                  instance_num_requests: Dict[str, int],
                  available_instance_infos: List[InstanceInfo],
-                 available_dispatch_instance_set: Set[str]) -> str:
+                 available_dispatch_instance_set: List[str]) -> str:
         sorted_instance_infos = sorted(
             available_instance_infos,
             key=lambda instance_info: getattr(instance_info, 'num_waiting_requests'),
@@ -129,7 +135,7 @@ class RoundRobin(DispatchPolicy):
     def dispatch(self,
                  instance_num_requests: Dict[str, int],
                  available_instance_infos: List[InstanceInfo],
-                 available_dispatch_instance_set: Set[str]) -> str:
+                 available_dispatch_instance_set: List[str]) -> str:
         all_instance_ids = sorted(instance_num_requests.keys())
         assert len(all_instance_ids) > 0
         target_instance_id = all_instance_ids[self.next_instance_idx % len(all_instance_ids)]
@@ -142,7 +148,7 @@ class AlwaysFirst(DispatchPolicy):
     def dispatch(self,
                  instance_num_requests: Dict[str, int],
                  available_instance_infos: List[InstanceInfo],
-                 available_dispatch_instance_set: Set[str]) -> str:
+                 available_dispatch_instance_set: List[str]) -> str:
         return available_dispatch_instance_set[0]
 
 

@@ -44,7 +44,7 @@ launch_ray_cluster(port=ray_cluster_port)
 connect_to_ray_cluster(port=ray_cluster_port)
 
 # Set manager args and engine args.
-manager_args = ManagerArgs(enable_pd_disagg=False)
+manager_args = ManagerArgs(enable_pd_disagg=False,enable_migration=True,pair_migration_frequency=10,is_group_kind_migration_backend=True)
 instance_args = InstanceArgs(migration_backend="nccl")
 entrypoints_args = EntrypointsArgs()
 # /mnt/sda1/cgg/deepseekR1-14b
@@ -95,12 +95,13 @@ async def main():
 
     for request in prompts:
         request_id = random_uuid()
-        ray.get(manager._preempt_migrate.remote(instance_ids[0]))
-        time.sleep(30)
+        new_instance_id=ray.get(manager.create_new_instance.remote())
         await manager.generate.remote(request_id=request_id,
                                       server_info=server_info,
                                       prompt=request,
                                       params=sampling_params,)
+        time.sleep(5)
+        ray.get(manager.preempt_migrate.remote(instance_ids[0],new_instance_id))
         
 
     await output_task
