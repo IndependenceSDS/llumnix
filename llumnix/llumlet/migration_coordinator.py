@@ -102,7 +102,11 @@ class MigrationCoordinator:
             while stage_count < self.migration_max_stages:
                 stage_count += 1
                 logger.info("migration stage {}:".format(stage_count))
+                start_time=time.perf_counter()
                 status = await self._migrate_out_onestage(migrate_in_ray_actor, migrate_out_request)
+                end_time = time.perf_counter()
+                elapsed_time = end_time - start_time
+                logger.info("migration stage {} time: {} seconds".format(stage_count,elapsed_time))
                 if MigrationStatus.is_finished(status):
                     return status
             # exceed max stages
