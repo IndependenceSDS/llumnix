@@ -15,7 +15,7 @@ import time
 import traceback
 import enum
 from typing import List
-
+import asyncio
 # pylint: disable=unused-import
 import ray
 
@@ -134,12 +134,16 @@ class MigrationCoordinator:
                 src_blocks = incremental_blocks[:-1]
                 incremental_token_ids = incremental_token_ids[:len(src_blocks)*migrate_out_request.block_size]
                 stage_block_num = len(incremental_blocks) - 1
+                start_time=time.perf_counter()
                 dst_blocks = await migrate_in_ray_actor.execute_migration_method \
                                         .remote("migrate_in_pre_alloc", migrate_out_request.request_id,
                                                                         migrate_out_request.status,
                                                                         migrate_out_request.request_arrival_time,
                                                                         stage_block_num,
                                                                         incremental_token_ids)
+                end_time = time.perf_counter()
+                elapsed_time = end_time - start_time
+                logger.info("migration pre alloc time: {} seconds".format(elapsed_time))
             else:
                 # last stage migration, stop inference, transfer all blocks
                 migration_status = MigrationStatus.FINISHED
@@ -149,12 +153,16 @@ class MigrationCoordinator:
                 self.backend_engine.add_migrating_out_request_last_stage(migrate_out_request)
                 src_blocks = incremental_blocks[:]
                 stage_block_num = len(incremental_blocks)
+                start_time=time.perf_counter()
                 dst_blocks = await migrate_in_ray_actor.execute_migration_method \
                                         .remote("migrate_in_pre_alloc", migrate_out_request.request_id,
                                                                         migrate_out_request.status,
                                                                         migrate_out_request.request_arrival_time,
                                                                         stage_block_num,
                                                                         incremental_token_ids)
+                end_time = time.perf_counter()
+                elapsed_time = end_time - start_time
+                logger.info("migration pre alloc time: {} seconds".format(elapsed_time))
 
             if len(dst_blocks) != len(src_blocks):
                 # migrate-in instance failed to pre alloc
@@ -170,8 +178,13 @@ class MigrationCoordinator:
             migrate_out_request.stage_timestamps.append(time.time())
             migrate_out_request.stage_num_blocks_list.append(stage_block_num)
             # TODO(ZeldaHuang): send_blocks in migrate_in_pre_alloc/migrate_in_last_stage
+            start_time=time.perf_counter()
             await self.backend_engine.send_blocks(migrate_in_ray_actor, src_blocks, dst_blocks)
-
+            end_time = time.perf_counter()
+            elapsed_time = end_time - start_time
+            logger.info("migration send data time: {} seconds".format(elapsed_time))
+            # time.sleep(stage_block_num*3.0/112)
+            await asyncio.sleep(stage_block_num*3.0/112)
             if not is_last_stage and migrate_out_request.should_abort_migration():
                 # migrate-out request abort by scheduler during send/recv
                 return MigrationStatus.ABORTED_SRC

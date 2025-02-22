@@ -14,25 +14,39 @@ from llumnix.queue.ray_queue_server import RayQueueServer
 
 from tests.conftest import cleanup_ray_env_func
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
 
 # Sample prompts.
 prompts = [
-    """
+"""You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
+
+If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.
+
 You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
 
 If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.
 
-Explain superconductors like I'\''m five years old""",
+You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
+
+If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.
+
+Given the quadratic function $f(x)=ax^{2}+bx+c$ with its derivative $f′(x)$, where $f′(0) > 0$, and $f(x)\\geqslant 0$ for any real number $x$, find the minimum value of $\\frac{f(1)}{f′(0)}$.""",
     
 ]
+
+"""
+You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
+
+If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.
+
+What is the coefficient of $x^2y^6$ in the expansion of $\\left(\\frac{3}{5}x-\\frac{y}{2}\\right)^8$? Express your answer as a common fraction."""
 
 # "The president of the United States is",
 #     "The capital of France is",
 #     "The future of AI is",
 
 # Create a sampling params object.
-sampling_params = SamplingParams(temperature=0.8, top_p=0.95,max_tokens=2048)
+sampling_params = SamplingParams(temperature=0.8, top_p=0.95,max_tokens=8192)
 
 # Launch ray cluster
 os.environ['HEAD_NODE'] = '1'
@@ -45,12 +59,13 @@ connect_to_ray_cluster(port=ray_cluster_port)
 
 # Set manager args and engine args.
 manager_args = ManagerArgs(enable_pd_disagg=False,enable_migration=True,pair_migration_frequency=10,is_group_kind_migration_backend=True)
-instance_args = InstanceArgs(migration_backend="nccl")
+instance_args = InstanceArgs(migration_backend="nccl",migration_last_stage_max_blocks=1)
 entrypoints_args = EntrypointsArgs()
 # /mnt/sda1/cgg/deepseekR1-14b
 # /mnt/sda1/cgg/opt6.7b
+# /mnt/sda1/cgg/opt30b
 engine_args = EngineArgs(model="/mnt/sda1/cgg/deepseekR1-14b", worker_use_ray=True,
-                         trust_remote_code=True, max_model_len=2048)
+                         trust_remote_code=True, max_model_len=8192)
 launch_args=LaunchArgs(LaunchMode.LOCAL, BackendType.VLLM)
 # launch_mode="LOCAL",backend_type="VLLM"
 # Create a manager. If the manager is created first, and then the instances are created.
@@ -100,7 +115,7 @@ async def main():
                                       server_info=server_info,
                                       prompt=request,
                                       params=sampling_params,)
-        time.sleep(5)
+        time.sleep(80)
         ray.get(manager.preempt_migrate.remote(instance_ids[0],new_instance_id))
         
 
