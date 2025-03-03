@@ -101,7 +101,9 @@ class LLMEngineLlumnix(_AsyncLLMEngine):
     ) -> "LLMEngineLlumnix":
         """Creates an LLM engine from the engine arguments."""
         # Create the engine configs.
+        logger.info("begin config")
         engine_config = engine_args.create_engine_config()
+        logger.info("end config")
         # Hack to pass placement_group for init workers.
         engine_config.parallel_config.placement_group = placement_group
         # Initialize the cluster and specify the executor class.

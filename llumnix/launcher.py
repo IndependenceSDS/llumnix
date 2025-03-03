@@ -63,6 +63,7 @@ class Launcher:
                               backend_type: BackendType,
                               init_server: bool = False,
                               block: bool = True) -> PlacementGroup:
+        logger.info("initial pg")
         if not BackendType.is_sim_backend(backend_type):
             # num_cpus=3, for Llumlet + AsyncPutQueueActor + ProxyActor
             # num_gpus=world_size, for world_size Workers
@@ -71,9 +72,11 @@ class Launcher:
                                                          num_gpus=world_size, detached=True, block=block)
         else:
             # num_cpus=1, for Llumlet + AsyncPutQueueActor
+            
             placement_group = initialize_placement_group(placement_group_name, num_cpus=2+int(init_server),
                                                          num_gpus=0, detached=True, block=block)
-
+            
+        logger.info("initial pg finish")
         return placement_group
 
     def get_instance_deployment_states(self, instance_id: str):
@@ -199,9 +202,12 @@ class Launcher:
 
         request_output_queue_type = QueueType(entrypoints_args.request_output_queue_type)
         next_instance_args = self._get_next_instance_args(instance_args)
+        logger.info("call init_instance")
         instance = self.init_instance(instance_id, next_instance_args, placement_group,
                                        request_output_queue_type, backend_type, engine_args)
+        
         next_entrypoints_args = self._get_next_entrypoints_args(entrypoints_args)
+        # logger.info("create instance begin!")
         server = self.init_server(get_server_name(instance_id), placement_group, next_entrypoints_args)
 
         self.inflight_num_prefill += 1 if next_instance_args.instance_type == InstanceType.PREFILL else 0

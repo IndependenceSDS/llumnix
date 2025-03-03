@@ -103,6 +103,7 @@ class Llumlet:
                 world_size = get_engine_world_size(engine_args, backend_type)
                 num_gpus = world_size
             # TODO(s5u13b): Check the max_concurrency.
+            logger.info("ray.remote!")
             llumlet_class = ray.remote(num_cpus=1,
                                        num_gpus=num_gpus,
                                        name=get_instance_name(instance_id),
@@ -115,12 +116,14 @@ class Llumlet:
                                                 placement_group_capture_child_tasks=True
                                             )
                                         )
+            logger.info("llumlet_class.remote!")
             llumlet = llumlet_class.remote(instance_id,
                                            instance_args,
                                            placement_group,
                                            request_output_queue_type,
                                            backend_type,
                                            engine_args)
+            logger.info("over!")
         # pylint: disable=broad-except
         except Exception as e:
             logger.error("Failed to initialize Llumlet: {}".format(e))

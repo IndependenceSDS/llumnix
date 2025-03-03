@@ -262,12 +262,14 @@ class Manager:
     async def create_new_instance(self) -> str:
         # 创建一个新实例
         try:
+            logger.info("create instance begin!")
             new_pg = None
             new_instance_id = random_uuid()
             new_pg = self.launcher.init_placement_group(get_placement_group_name(new_instance_id), self.engine_args, self.backend_type,
                                                         init_server=True, block=False)
             try:
                 await asyncio.wait_for(new_pg.ready(), WAIT_PLACEMENT_GROUP_TIMEOUT)
+                logger.info("placement group finish!")
             except asyncio.TimeoutError:
                 logger.debug("Waiting for new placement group {} ready timeout.".format(new_instance_id))
                 # After timeout, the new placement group might be pending,
@@ -322,6 +324,7 @@ class Manager:
         try:
             # 发起迁移请求
             # 由调度器决定迁移的实例对
+            logger.info("cgg begin migration!")
             migrate_instance_pairs = [(old_instance_id,new_instance_id)]
             migration_tasks = []
             for _, migrate_instance_pair in enumerate(migrate_instance_pairs):
@@ -340,7 +343,7 @@ class Manager:
                 task.add_done_callback(partial(migrate_done_callback_wrapper, migrate_instance_pair))
                 migration_tasks.append(task)
             await asyncio.gather(*migration_tasks, return_exceptions=True)
-            
+            logger.info("cgg end migration!")
         # pylint: disable=broad-except
         except Exception as e:
             logger.error("Unexpected exception: {}".format(e))
